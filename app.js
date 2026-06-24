@@ -2,7 +2,7 @@
 // CẤU HÌNH: dán URL Web App của Google Apps Script vào đây
 // Ví dụ: "https://script.google.com/macros/s/AKfycb..../exec"
 // ========================================================
-const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyCYkpcSGnZ4lx9Zy209JNReArfmyC-8FFsPngU3AflkNUFU0AwHuTTGxESFZKrfmyK/exec";
+const SCRIPT_URL = "DÁN_URL_GOOGLE_APPS_SCRIPT_VÀO_ĐÂY";
 
 // ========================================================
 // Biến trạng thái
@@ -31,6 +31,8 @@ function checkConfig() {
 // ========================================================
 // Camera quét mã (html5-qrcode)
 // ========================================================
+let html5QrCodeInstance = null;
+
 function initScanner() {
   const statusBar = document.getElementById("statusBar");
 
@@ -49,21 +51,31 @@ function initScanner() {
   const html5QrCode = new Html5Qrcode("reader", {
     formatsToSupport: formatsToSupport,
     verbose: false,
+    experimentalFeatures: {
+      useBarCodeDetectorIfSupported: true,
+    },
   });
+  html5QrCodeInstance = html5QrCode;
 
   const config = {
-    fps: 10,
+    fps: 15,
+    // Khung chữ nhật ngang, rộng hơn cao - phù hợp barcode 1D dài và mảnh
     qrbox: function (viewfinderWidth, viewfinderHeight) {
-      const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
-      const size = Math.floor(minEdge * 0.7);
-      return { width: size, height: size };
+      const width = Math.floor(viewfinderWidth * 0.85);
+      const height = Math.floor(viewfinderHeight * 0.35);
+      return { width: width, height: height };
     },
     aspectRatio: 1.3,
+    disableFlip: false,
+  };
+
+  const cameraConfig = {
+    facingMode: "environment",
   };
 
   html5QrCode
     .start(
-      { facingMode: "environment" },
+      cameraConfig,
       config,
       (decodedText) => {
         handleScanSuccess(decodedText);
@@ -74,11 +86,87 @@ function initScanner() {
     )
     .then(() => {
       statusBar.textContent = "Đưa camera vào mã barcode để quét";
+      setupCameraControls();
     })
     .catch((err) => {
       console.error(err);
       statusBar.textContent =
         "Không thể mở camera. Hãy cấp quyền Camera cho Safari trong Cài đặt, hoặc dùng ô nhập tay bên dưới.";
+    });
+}
+
+// ========================================================
+// Điều khiển Zoom / Đèn flash (nếu thiết bị hỗ trợ)
+// ========================================================
+let currentZoom = 1;
+let zoomCapabilities = null;
+let torchOn = false;
+let torchSupported = false;
+
+function setupCameraControls() {
+  const videoEl = document.querySelector("#reader video");
+  if (!videoEl || !videoEl.srcObject) return;
+
+  const track = videoEl.srcObject.getVideoTracks()[0];
+  if (!track) return;
+
+  const capabilities = track.getCapabilities ? track.getCapabilities() : {};
+  const controlsBar = document.getElementById("cameraControls");
+  const zoomInBtn = document.getElementById("zoomInBtn");
+  const zoomOutBtn = document.getElementById("zoomOutBtn");
+  const torchBtn = document.getElementById("torchBtn");
+
+  let anyControlAvailable = false;
+
+  // --- Zoom ---
+  if (capabilities.zoom) {
+    zoomCapabilities = capabilities.zoom;
+    currentZoom = track.getSettings().zoom || capabilities.zoom.min || 1;
+    anyControlAvailable = true;
+
+    zoomInBtn.addEventListener("click", () => adjustZoom(track, 0.5));
+    zoomOutBtn.addEventListener("click", () => adjustZoom(track, -0.5));
+  } else {
+    zoomInBtn.style.display = "none";
+    zoomOutBtn.style.display = "none";
+  }
+
+  // --- Đèn flash (torch) ---
+  if (capabilities.torch) {
+    torchSupported = true;
+    anyControlAvailable = true;
+    torchBtn.addEventListener("click", () => toggleTorch(track));
+  } else {
+    torchBtn.style.display = "none";
+  }
+
+  if (anyControlAvailable) {
+    controlsBar.style.display = "flex";
+  }
+}
+
+function adjustZoom(track, delta) {
+  if (!zoomCapabilities) return;
+  const min = zoomCapabilities.min || 1;
+  const max = zoomCapabilities.max || 1;
+  let newZoom = Math.min(max, Math.max(min, currentZoom + delta));
+  currentZoom = newZoom;
+
+  track
+    .applyConstraints({ advanced: [{ zoom: newZoom }] })
+    .catch((err) => console.error("Zoom error:", err));
+}
+
+function toggleTorch(track) {
+  torchOn = !torchOn;
+  track
+    .applyConstraints({ advanced: [{ torch: torchOn }] })
+    .then(() => {
+      document.getElementById("torchBtn").classList.toggle("active", torchOn);
+    })
+    .catch((err) => {
+      console.error("Torch error:", err);
+      showToast("Đèn flash không khả dụng trên thiết bị này", "error");
     });
 }
 

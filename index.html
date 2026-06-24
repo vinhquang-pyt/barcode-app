@@ -55,6 +55,27 @@
   #reader video{
     border-radius:16px;
   }
+  .camera-controls{
+    display:flex;
+    gap:8px;
+    margin-top:10px;
+  }
+  .btn-control{
+    flex:1;
+    background:var(--card);
+    border:1px solid var(--border);
+    color:var(--text);
+    padding:10px 8px;
+    border-radius:10px;
+    font-size:13px;
+  }
+  .btn-control:active{
+    background:#22252e;
+  }
+  .btn-control.active{
+    border-color:var(--accent);
+    color:var(--accent);
+  }
   .card{
     background:var(--card);
     border:1px solid var(--border);
@@ -232,6 +253,12 @@
   </div>
 
   <div id="reader"></div>
+
+  <div class="camera-controls" id="cameraControls" style="display:none;">
+    <button class="btn-control" id="zoomOutBtn">➖ Zoom</button>
+    <button class="btn-control" id="zoomInBtn">➕ Zoom</button>
+    <button class="btn-control" id="torchBtn">💡 Đèn flash</button>
+  </div>
 
   <div class="card">
     <div class="section-label">Nhập tay (khi không quét được)</div>

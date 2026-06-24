@@ -2,7 +2,11 @@
 // CẤU HÌNH: dán URL Web App của Google Apps Script vào đây
 // Ví dụ: "https://script.google.com/macros/s/AKfycb..../exec"
 // ========================================================
-const SCRIPT_URL = "DÁN_URL_GOOGLE_APPS_SCRIPT_VÀO_ĐÂY";
+const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyCYkpcSGnZ4lx9Zy209JNReArfmyC-8FFsPngU3AflkNUFU0AwHuTTGxESFZKrfmyK/exec";
+
+// PHẢI khớp chính xác với biến SECRET_KEY trong file Apps Script (.gs)
+// Đổi thành chuỗi bí mật riêng của bạn, ví dụ: "kho-spc-2026-x7k9"
+const SECRET_KEY = "jppydpftYmA54YrgSpkWGGPZFSetVtxU";
 
 // ========================================================
 // Biến trạng thái
@@ -23,7 +27,9 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 function checkConfig() {
-  if (!SCRIPT_URL || SCRIPT_URL.includes("DÁN_URL")) {
+  const urlNotSet = !SCRIPT_URL || SCRIPT_URL.includes("DÁN_URL");
+  const keyNotSet = !SECRET_KEY || SECRET_KEY.includes("DOI_CHUOI");
+  if (urlNotSet || keyNotSet) {
     document.getElementById("configWarning").style.display = "block";
   }
 }
@@ -238,7 +244,7 @@ async function submitCode(barcode, source) {
       headers: {
         "Content-Type": "text/plain;charset=utf-8",
       },
-      body: JSON.stringify({ barcode, timestamp, source }),
+      body: JSON.stringify({ barcode, timestamp, source, key: SECRET_KEY }),
     });
 
     const result = await response.json();

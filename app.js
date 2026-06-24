@@ -13,7 +13,7 @@ const SECRET_KEY = "jppydpftYmA54YrgSpkWGGPZFSetVtxU";
 // ========================================================
 let lastScannedCode = null;
 let lastScannedAt = 0;
-const DUPLICATE_COOLDOWN_MS = 2500; // tránh gửi trùng mã liên tiếp trong X ms
+const DUPLICATE_COOLDOWN_MS = 1500; // tránh gửi trùng mã liên tiếp trong X ms
 let historyItems = []; // lưu trong session (reset khi reload trang)
 
 // ========================================================
@@ -64,19 +64,23 @@ function initScanner() {
   html5QrCodeInstance = html5QrCode;
 
   const config = {
-    fps: 15,
+    fps: 20,
     // Khung chữ nhật ngang, rộng hơn cao - phù hợp barcode 1D dài và mảnh
     qrbox: function (viewfinderWidth, viewfinderHeight) {
-      const width = Math.floor(viewfinderWidth * 0.85);
-      const height = Math.floor(viewfinderHeight * 0.35);
+      const width = Math.floor(viewfinderWidth * 0.9);
+      const height = Math.floor(viewfinderHeight * 0.45);
       return { width: width, height: height };
     },
     aspectRatio: 1.3,
     disableFlip: false,
   };
 
+  // Yêu cầu độ phân giải cao + lấy nét liên tục (giúp đọc rõ mã nhỏ/mã mờ)
   const cameraConfig = {
     facingMode: "environment",
+    width: { ideal: 1920, min: 1280 },
+    height: { ideal: 1080, min: 720 },
+    advanced: [{ focusMode: "continuous" }],
   };
 
   html5QrCode
@@ -124,10 +128,17 @@ function setupCameraControls() {
 
   let anyControlAvailable = false;
 
+  // --- Lấy nét liên tục (giúp camera tự nét lại khi đưa mã vào gần) ---
+  if (capabilities.focusMode && capabilities.focusMode.includes("continuous")) {
+    track.applyConstraints({ advanced: [{ focusMode: "continuous" }] }).catch(() => {});
+  }
+
   // --- Zoom ---
   if (capabilities.zoom) {
     zoomCapabilities = capabilities.zoom;
-    currentZoom = track.getSettings().zoom || capabilities.zoom.min || 1;
+    const startZoom = Math.min(capabilities.zoom.max, Math.max(capabilities.zoom.min, 1.5));
+    currentZoom = startZoom;
+    track.applyConstraints({ advanced: [{ zoom: startZoom }] }).catch(() => {});
     anyControlAvailable = true;
 
     zoomInBtn.addEventListener("click", () => adjustZoom(track, 0.5));

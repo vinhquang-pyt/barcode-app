@@ -24,7 +24,21 @@ document.addEventListener("DOMContentLoaded", () => {
   initScanner();
   bindManualInput();
   bindClearHistory();
+  bindAudioUnlock();
 });
+
+// Safari chỉ cho phép phát âm thanh sau khi có tương tác người dùng (chạm/click).
+// Vì camera tự bật ngay khi vào trang, ta "mở khóa" AudioContext ngay lần chạm đầu tiên,
+// để đảm bảo tiếng bíp phát được kể cả ở lần quét đầu tiên.
+function bindAudioUnlock() {
+  const unlock = () => {
+    getAudioContext();
+    document.removeEventListener("touchstart", unlock);
+    document.removeEventListener("click", unlock);
+  };
+  document.addEventListener("touchstart", unlock, { once: true });
+  document.addEventListener("click", unlock, { once: true });
+}
 
 function checkConfig() {
   const urlNotSet = !SCRIPT_URL || SCRIPT_URL.includes("DÁN_URL");
@@ -188,6 +202,58 @@ function toggleTorch(track) {
 }
 
 // ========================================================
+// Âm thanh phản hồi (Web Audio API - không cần file audio)
+// ========================================================
+let audioCtx = null;
+
+function getAudioContext() {
+  // Phải tạo AudioContext sau 1 tương tác người dùng (yêu cầu của Safari)
+  if (!audioCtx) {
+    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+    audioCtx = new AudioContextClass();
+  }
+  if (audioCtx.state === "suspended") {
+    audioCtx.resume();
+  }
+  return audioCtx;
+}
+
+function playTone(frequency, durationMs, volume) {
+  try {
+    const ctx = getAudioContext();
+    const oscillator = ctx.createOscillator();
+    const gainNode = ctx.createGain();
+
+    oscillator.type = "sine";
+    oscillator.frequency.value = frequency;
+    gainNode.gain.value = volume;
+
+    oscillator.connect(gainNode);
+    gainNode.connect(ctx.destination);
+
+    const now = ctx.currentTime;
+    oscillator.start(now);
+    // giảm âm lượng dần để tránh tiếng "tách" khi tắt
+    gainNode.gain.setValueAtTime(volume, now);
+    gainNode.gain.exponentialRampToValueAtTime(0.001, now + durationMs / 1000);
+    oscillator.stop(now + durationMs / 1000);
+  } catch (err) {
+    console.error("Audio error:", err);
+  }
+}
+
+// Tiếng "bíp" cao, ngắn - giống máy quét kho, phát ngay khi camera nhận ra mã
+function playSuccessBeep() {
+  playTone(1500, 100, 0.25);
+}
+
+// Tiếng đôi thấp - báo gửi lên Sheet thất bại
+function playErrorBeep() {
+  playTone(300, 150, 0.25);
+  setTimeout(() => playTone(300, 150, 0.25), 180);
+}
+
+// ========================================================
 // Xử lý khi quét thành công
 // ========================================================
 function handleScanSuccess(code) {
@@ -200,6 +266,7 @@ function handleScanSuccess(code) {
   lastScannedAt = now;
 
   vibrate();
+  playSuccessBeep();
   submitCode(code, "camera");
 }
 
@@ -219,6 +286,7 @@ function bindManualInput() {
   const submit = () => {
     const value = input.value.trim();
     if (!value) return;
+    playSuccessBeep();
     submitCode(value, "manual");
     input.value = "";
     input.blur();
@@ -271,6 +339,7 @@ async function submitCode(barcode, source) {
     console.error(err);
     updateLastScanUI(barcode, timestamp, "error");
     updateHistoryStatus(historyId, "error");
+    playErrorBeep();
     showToast("Gửi thất bại. Kiểm tra kết nối mạng.", "error");
   }
 }

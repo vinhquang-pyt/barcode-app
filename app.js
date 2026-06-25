@@ -8,6 +8,8 @@ const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyCYkpcSGnZ4lx9Zy209
 // Đổi thành chuỗi bí mật riêng của bạn, ví dụ: "kho-spc-2026-x7k9"
 const SECRET_KEY = "jppydpftYmA54YrgSpkWGGPZFSetVtxU";
 
+
+
 // ========================================================
 // Biến trạng thái
 // ========================================================
@@ -17,11 +19,48 @@ const DUPLICATE_COOLDOWN_MS = 1500; // tránh gửi trùng mã liên tiếp tron
 let historyItems = []; // lưu trong session (reset khi reload trang)
 
 // ========================================================
+// DEBUG: hiển thị lỗi JS trực tiếp lên màn hình (không cần Mac/Console)
+// Có thể xóa khối này sau khi đã xác định và sửa xong lỗi.
+// ========================================================
+window.addEventListener("error", function (event) {
+  showDebugError(
+    "JS Error: " + event.message + " (dòng " + event.lineno + ")"
+  );
+});
+window.addEventListener("unhandledrejection", function (event) {
+  showDebugError("Promise Error: " + (event.reason && event.reason.message ? event.reason.message : event.reason));
+});
+
+function showDebugError(text) {
+  let box = document.getElementById("debugErrorBox");
+  if (!box) {
+    box = document.createElement("div");
+    box.id = "debugErrorBox";
+    box.style.background = "#3a0d0d";
+    box.style.color = "#ffb3b3";
+    box.style.border = "1px solid #ef4444";
+    box.style.borderRadius = "12px";
+    box.style.padding = "12px 14px";
+    box.style.margin = "12px 16px";
+    box.style.fontSize = "13px";
+    box.style.fontFamily = "monospace";
+    box.style.whiteSpace = "pre-wrap";
+    box.style.wordBreak = "break-word";
+    document.body.insertBefore(box, document.body.firstChild.nextSibling);
+  }
+  box.textContent += (box.textContent ? "\n\n" : "🐞 LỖI: \n") + text;
+}
+
+// ========================================================
 // Khởi động
 // ========================================================
 document.addEventListener("DOMContentLoaded", () => {
   checkConfig();
-  initScanner();
+  try {
+    initScanner();
+  } catch (err) {
+    showDebugError("Lỗi khi khởi tạo scanner: " + err.message);
+  }
   bindManualInput();
   bindClearHistory();
   bindAudioUnlock();
@@ -55,6 +94,12 @@ let html5QrCodeInstance = null;
 
 function initScanner() {
   const statusBar = document.getElementById("statusBar");
+
+  if (typeof Html5Qrcode === "undefined" || typeof Html5QrcodeSupportedFormats === "undefined") {
+    statusBar.textContent = "Không tải được thư viện quét mã (kiểm tra kết nối mạng / CDN bị chặn).";
+    showDebugError("Html5Qrcode chưa được load - thư viện từ unpkg.com có thể bị chặn hoặc lỗi mạng.");
+    return;
+  }
 
   const formatsToSupport = [
     Html5QrcodeSupportedFormats.QR_CODE,
@@ -123,7 +168,7 @@ function initScanner() {
           (decodedText) => {
             handleScanSuccess(decodedText);
           },
-          () => {}
+          () => { }
         )
         .then(() => {
           statusBar.textContent = "Đưa camera vào mã barcode để quét";
@@ -162,7 +207,7 @@ function setupCameraControls() {
 
   // --- Lấy nét liên tục (giúp camera tự nét lại khi đưa mã vào gần) ---
   if (capabilities.focusMode && capabilities.focusMode.includes("continuous")) {
-    track.applyConstraints({ advanced: [{ focusMode: "continuous" }] }).catch(() => {});
+    track.applyConstraints({ advanced: [{ focusMode: "continuous" }] }).catch(() => { });
   }
 
   // --- Zoom ---
@@ -170,7 +215,7 @@ function setupCameraControls() {
     zoomCapabilities = capabilities.zoom;
     const startZoom = Math.min(capabilities.zoom.max, Math.max(capabilities.zoom.min, 1.5));
     currentZoom = startZoom;
-    track.applyConstraints({ advanced: [{ zoom: startZoom }] }).catch(() => {});
+    track.applyConstraints({ advanced: [{ zoom: startZoom }] }).catch(() => { });
     anyControlAvailable = true;
 
     zoomInBtn.addEventListener("click", () => adjustZoom(track, 0.5));

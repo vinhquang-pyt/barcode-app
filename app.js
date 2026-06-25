@@ -10,6 +10,8 @@ const SECRET_KEY = "jppydpftYmA54YrgSpkWGGPZFSetVtxU";
 
 
 
+
+
 // ========================================================
 // Biến trạng thái
 // ========================================================
@@ -134,12 +136,12 @@ function initScanner() {
     disableFlip: false,
   };
 
-  // Yêu cầu độ phân giải cao (chỉ dùng "ideal" - trình duyệt tự hạ xuống mức
-  // gần nhất nếu camera không đáp ứng được, tránh bị từ chối toàn bộ request)
+  // Dùng constraints đơn giản nhất để mở camera (ổn định nhất trên Safari iOS).
+  // Độ phân giải cao/zoom/focus sẽ được áp dụng SAU khi camera đã chạy ổn,
+  // thông qua applyConstraints() trong setupCameraControls() - tránh gọi
+  // start() nhiều lần gây lỗi "already under transition".
   const cameraConfig = {
     facingMode: "environment",
-    width: { ideal: 1920 },
-    height: { ideal: 1080 },
   };
 
   html5QrCode
@@ -158,27 +160,10 @@ function initScanner() {
       setupCameraControls();
     })
     .catch((err) => {
-      console.error("Lỗi mở camera với độ phân giải cao, thử lại với cấu hình đơn giản:", err);
-      // Fallback: thử lại với constraints tối giản, tránh trường hợp camera/thiết bị
-      // từ chối toàn bộ request vì width/height yêu cầu quá cụ thể
-      html5QrCode
-        .start(
-          { facingMode: "environment" },
-          config,
-          (decodedText) => {
-            handleScanSuccess(decodedText);
-          },
-          () => { }
-        )
-        .then(() => {
-          statusBar.textContent = "Đưa camera vào mã barcode để quét";
-          setupCameraControls();
-        })
-        .catch((err2) => {
-          console.error(err2);
-          statusBar.textContent =
-            "Không thể mở camera. Hãy cấp quyền Camera cho Safari trong Cài đặt, hoặc dùng ô nhập tay bên dưới.";
-        });
+      console.error(err);
+      showDebugError("Lỗi mở camera: " + (err && err.message ? err.message : err));
+      statusBar.textContent =
+        "Không thể mở camera. Hãy cấp quyền Camera cho Safari trong Cài đặt, hoặc dùng ô nhập tay bên dưới.";
     });
 }
 
@@ -204,6 +189,16 @@ function setupCameraControls() {
   const torchBtn = document.getElementById("torchBtn");
 
   let anyControlAvailable = false;
+
+  // --- Nâng độ phân giải lên cao nếu camera hỗ trợ (giúp đọc rõ mã nhỏ/mờ).
+  // Áp dụng SAU khi camera đã chạy ổn để tránh lỗi khi khởi tạo.
+  if (capabilities.width && capabilities.height) {
+    const targetWidth = Math.min(capabilities.width.max || 1920, 1920);
+    const targetHeight = Math.min(capabilities.height.max || 1080, 1080);
+    track
+      .applyConstraints({ advanced: [{ width: targetWidth, height: targetHeight }] })
+      .catch(() => { });
+  }
 
   // --- Lấy nét liên tục (giúp camera tự nét lại khi đưa mã vào gần) ---
   if (capabilities.focusMode && capabilities.focusMode.includes("continuous")) {

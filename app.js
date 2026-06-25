@@ -10,8 +10,6 @@ const SECRET_KEY = "jppydpftYmA54YrgSpkWGGPZFSetVtxU";
 
 
 
-
-
 // ========================================================
 // Biến trạng thái
 // ========================================================
@@ -493,3 +491,5 @@ function showToast(message, type) {
     toast.className = "toast";
   }, 2200);
 }
+
+

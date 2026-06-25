@@ -89,12 +89,12 @@ function initScanner() {
     disableFlip: false,
   };
 
-  // Yêu cầu độ phân giải cao + lấy nét liên tục (giúp đọc rõ mã nhỏ/mã mờ)
+  // Yêu cầu độ phân giải cao (chỉ dùng "ideal" - trình duyệt tự hạ xuống mức
+  // gần nhất nếu camera không đáp ứng được, tránh bị từ chối toàn bộ request)
   const cameraConfig = {
     facingMode: "environment",
-    width: { ideal: 1920, min: 1280 },
-    height: { ideal: 1080, min: 720 },
-    advanced: [{ focusMode: "continuous" }],
+    width: { ideal: 1920 },
+    height: { ideal: 1080 },
   };
 
   html5QrCode
@@ -113,9 +113,27 @@ function initScanner() {
       setupCameraControls();
     })
     .catch((err) => {
-      console.error(err);
-      statusBar.textContent =
-        "Không thể mở camera. Hãy cấp quyền Camera cho Safari trong Cài đặt, hoặc dùng ô nhập tay bên dưới.";
+      console.error("Lỗi mở camera với độ phân giải cao, thử lại với cấu hình đơn giản:", err);
+      // Fallback: thử lại với constraints tối giản, tránh trường hợp camera/thiết bị
+      // từ chối toàn bộ request vì width/height yêu cầu quá cụ thể
+      html5QrCode
+        .start(
+          { facingMode: "environment" },
+          config,
+          (decodedText) => {
+            handleScanSuccess(decodedText);
+          },
+          () => {}
+        )
+        .then(() => {
+          statusBar.textContent = "Đưa camera vào mã barcode để quét";
+          setupCameraControls();
+        })
+        .catch((err2) => {
+          console.error(err2);
+          statusBar.textContent =
+            "Không thể mở camera. Hãy cấp quyền Camera cho Safari trong Cài đặt, hoặc dùng ô nhập tay bên dưới.";
+        });
     });
 }
 
